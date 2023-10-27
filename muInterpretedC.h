@@ -5,6 +5,8 @@ No warranty implied; use at your own risk.
 
 Licensed under MIT License or public domain, whichever you prefer.
 More explicit license information at the end of the file.
+
+@TODO test non-8-bit-width values
 */
 
 #ifndef MUIC_H
@@ -174,7 +176,7 @@ MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m byt
 MUDEF muContext mu_context_destroy(muResult* result, muContext context);
 
 // binary/bit/byte handling
-MUDEF size_m mu_string_to_binary(const char* s);
+MUDEF muByte mu_string_to_binary(const char* s);
 
 #ifdef __cplusplus
 	}
@@ -293,7 +295,26 @@ muicDataType mu_get_data_type_from_bytecode(muByte* bytecode) {
 
 // registers
 
-// @TODO handle non-0 pointer count dereferencing here
+uint64_m mu_context_get_reg_pointer_value(muByte* reg, size_m reg_len) {
+	switch (reg_len) {
+	default:
+		return 0;
+		break;
+	case 1:
+		return mu_get_uint8_from_bytecode(reg);
+		break;
+	case 2:
+		return mu_get_uint16_from_bytecode(reg);
+		break;
+	case 4:
+		return mu_get_uint32_from_bytecode(reg);
+		break;
+	case 8:
+		return mu_get_uint64_from_bytecode(reg);
+		break;
+	}
+}
+
 muResult mu_context_fill_reg0_with_data_type(muContext* context, muicDataType dt, muByte* bytecode) {
 	if ((context->reg0 == MU_NULL_PTR) || (context->reg0_len < dt.byte_size)) {
 		if (context->reg0 != MU_NULL_PTR) {
@@ -302,10 +323,30 @@ muResult mu_context_fill_reg0_with_data_type(muContext* context, muicDataType dt
 		context->reg0 = mu_malloc(dt.byte_size);
 		context->reg0_len = dt.byte_size;
 	}
+	// @TODO maybe extra out-of-range checking here? and for rest of func
 	if (dt.pointer_count == 0) {
 		mu_memcpy(context->reg0, bytecode, dt.byte_size);
 	} else {
-		
+		if (context->reg0_len < context->bitwidth / 8) {
+			context->reg0 = mu_realloc(context->reg0, context->bitwidth / 8);
+			context->reg0_len = context->bitwidth / 8;
+		}
+		mu_memcpy(context->reg0, bytecode, context->bitwidth);
+		while (dt.pointer_count > 0) {
+			if (dt.pointer_count != 1) {
+				mu_memcpy(context->reg0, &context->static_memory[mu_context_get_reg_pointer_value(context->reg0, context->bitwidth / 8)], context->bitwidth / 8);
+			} else {
+				mu_memcpy(context->reg0, &context->static_memory[mu_context_get_reg_pointer_value(context->reg0, context->bitwidth / 8)], dt.byte_size);
+			}
+			if (
+				dt.pointer_count != 1 && 
+				(mu_context_get_reg_pointer_value(context->reg0, context->bitwidth / 8) + context->bitwidth / 8) > context->static_memory_len
+			) {
+				mu_print("[MUIC] WARNING! Invalid memory address modification attempt!\n");
+				return MU_FAILURE;
+			}
+			dt.pointer_count--;
+		}
 	}
 	return MU_SUCCESS;
 }
@@ -321,29 +362,28 @@ muResult mu_context_fill_reg1_with_data_type(muContext* context, muicDataType dt
 	if (dt.pointer_count == 0) {
 		mu_memcpy(context->reg1, bytecode, dt.byte_size);
 	} else {
-		
+		if (context->reg1_len < context->bitwidth / 8) {
+			context->reg1 = mu_realloc(context->reg1, context->bitwidth / 8);
+			context->reg1_len = context->bitwidth / 8;
+		}
+		mu_memcpy(context->reg1, bytecode, context->bitwidth);
+		while (dt.pointer_count > 0) {
+			if (dt.pointer_count != 1) {
+				mu_memcpy(context->reg1, &context->static_memory[mu_context_get_reg_pointer_value(context->reg1, context->bitwidth / 8)], context->bitwidth / 8);
+			} else {
+				mu_memcpy(context->reg1, &context->static_memory[mu_context_get_reg_pointer_value(context->reg1, context->bitwidth / 8)], dt.byte_size);
+			}
+			if (
+				dt.pointer_count != 1 && 
+				(mu_context_get_reg_pointer_value(context->reg1, context->bitwidth / 8) + context->bitwidth / 8) > context->static_memory_len
+			) {
+				mu_print("[MUIC] WARNING! Invalid memory address modification attempt!\n");
+				return MU_FAILURE;
+			}
+			dt.pointer_count--;
+		}
 	}
 	return MU_SUCCESS;
-}
-
-uint64_m mu_context_get_reg1_value(muContext* context) {
-	switch (context->reg1_len) {
-	default:
-		return 0;
-		break;
-	case 1:
-		return mu_get_uint8_from_bytecode(context->reg1);
-		break;
-	case 2:
-		return mu_get_uint16_from_bytecode(context->reg1);
-		break;
-	case 4:
-		return mu_get_uint32_from_bytecode(context->reg1);
-		break;
-	case 8:
-		return mu_get_uint64_from_bytecode(context->reg1);
-		break;
-	}
 }
 
 // instructions
@@ -352,6 +392,7 @@ muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 	size_m offset = 0;
 
 	// @TODO check for reg fill function results
+	// @TODO make sure we're in range here
 	// obtain value from src_dt into reg0 (pointer=0 means we have actual value)
 	muicDataType src_dt = mu_get_data_type_from_bytecode(bytecode);
 	mu_context_fill_reg0_with_data_type(context, src_dt, &bytecode[3]);
@@ -360,7 +401,7 @@ muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 	offset = 0;
 	offset += 3;
 	if (src_dt.pointer_count > 0) {
-		offset += context->bitwidth;
+		offset += context->bitwidth / 8;
 	} else {
 		offset += src_dt.byte_size;
 	}
@@ -368,14 +409,14 @@ muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 	mu_context_fill_reg1_with_data_type(context, dst_dt, &bytecode[offset+3]);
 
 	// set memory address point stored in reg1 to reg0
-	uint64_m reg1_val = mu_context_get_reg1_value(context);
-	if (reg1_val + src_dt.byte_size > context->static_memory_len) {
+	uint64_m reg1_val = mu_context_get_reg_pointer_value(context->reg1, context->bitwidth / 8);
+	if ((reg1_val + src_dt.byte_size > context->static_memory_len) || reg1_val == 0) {
 		mu_print("[MUIC] WARNING! Invalid memory address modification attempt!\n");
 		return MU_FAILURE;
 	}
 
 	// @TODO handle non-matching data type cases here (including signed/unsigned)
-	for (size_m i = 0; i < src_dt.byte_size; i++) {
+	for (size_m i = 0; i < src_dt.byte_size && i < dst_dt.byte_size; i++) {
 		context->static_memory[reg1_val+i] = context->reg0[i];
 	}
 	
@@ -431,8 +472,8 @@ MUDEF muContext mu_context_destroy(muResult* result, muContext context) {
 	return context;
 }
 
-MUDEF size_m mu_string_to_binary(const char* s) {
-	size_m i = 0;
+MUDEF muByte mu_string_to_binary(const char* s) {
+	muByte i = 0;
 	while (*s) {
 		i <<= 1;
 		i += *s++ - '0';
