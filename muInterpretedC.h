@@ -59,7 +59,11 @@ More explicit license information at the end of the file.
 #if !defined(uint64_m) || \
 	!defined(uint32_m) || \
 	!defined(uint16_m) || \
-	!defined(uint8_m)
+	!defined(uint8_m)  || \
+	!defined(int64_m)  || \
+	!defined(int32_m)  || \
+	!defined(int16_m)  || \
+	!defined(int8_m)
 
 	#include <stdint.h>
 
@@ -77,6 +81,22 @@ More explicit license information at the end of the file.
 	
 	#ifndef uint8_m
 		#define uint8_m uint8_t
+	#endif
+
+	#ifndef int64_m
+		#define int64_m uint64_t
+	#endif
+
+	#ifndef int32_m
+		#define int32_m uint32_t
+	#endif
+
+	#ifndef int16_m
+		#define int16_m uint16_t
+	#endif
+	
+	#ifndef int8_m
+		#define int8_m uint8_t
 	#endif
 
 #endif
@@ -409,20 +429,1015 @@ muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 	mu_context_fill_reg1_with_data_type(context, dst_dt, &bytecode[offset+3]);
 
 	// set memory address point stored in reg1 to reg0
+
 	uint64_m reg1_val = mu_context_get_reg_pointer_value(context->reg1, context->bitwidth / 8);
 	if ((reg1_val + src_dt.byte_size > context->static_memory_len) || reg1_val == 0) {
 		mu_print("[MUIC] WARNING! Invalid memory address modification attempt!\n");
 		return MU_FAILURE;
 	}
-
-	if (src_dt.sign == dst_dt.sign && src_dt.type == dst_dt.type) {
-		size_m min_byte_size = src_dt.byte_size;
-		if (dst_dt.byte_size < src_dt.byte_size) {
-			min_byte_size = dst_dt.byte_size;
-		}
+	
+	if (
+		(src_dt.type == MUIC_DATA_TYPE_VOID || src_dt.type == MUIC_DATA_TYPE_STRUCT) ||
+		(dst_dt.type == MUIC_DATA_TYPE_VOID || dst_dt.type == MUIC_DATA_TYPE_STRUCT)
+	) {
 		for (size_m i = 0; i < src_dt.byte_size && i < dst_dt.byte_size; i++) {
-			context->static_memory[reg1_val+min_byte_size-i-1] = context->reg0[src_dt.byte_size-i-1];
+			context->static_memory[reg1_val+i] = context->reg0[i];
 		}
+	}
+	
+	switch (src_dt.byte_size) { default: break;
+		case 1: {
+			switch (dst_dt.byte_size) { default: break;
+				case 1: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 2: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 4: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 8: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+			}
+		} break;
+		case 2: {
+			switch (dst_dt.byte_size) { default: break;
+				case 1: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 2: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 4: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 8: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+			}
+		} break;
+		case 4: {
+			switch (dst_dt.byte_size) { default: break;
+				case 1: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 2: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 4: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 8: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+			}
+		} break;
+		case 8: {
+			switch (dst_dt.byte_size) { default: break;
+				case 1: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint8_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int8_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 2: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint16_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int16_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												//case MUIC_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 4: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint32_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int32_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((float*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+				case 8: {
+					switch (src_dt.type) { default: break;
+						case MUIC_DATA_TYPE_INTEGER: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_UNSIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+						case MUIC_DATA_TYPE_DECIMAL: {
+							switch (dst_dt.type) { default: break;
+								case MUIC_DATA_TYPE_INTEGER: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint64_m*)&context->reg0[0])); } break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int64_m*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+								case MUIC_DATA_TYPE_DECIMAL: {
+									switch (src_dt.sign) { default: break;
+										case MUIC_DATA_TYPE_SIGNED: {
+											switch (dst_dt.sign) { default: break;
+												case MUIC_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((double*)&context->reg0[0])); } break;
+											}
+										} break;
+									}
+								} break;
+							} break;
+						} break;
+					}
+				} break;
+			}
+		} break;
 	}
 	
 	return MU_SUCCESS;
