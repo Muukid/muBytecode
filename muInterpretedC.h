@@ -415,9 +415,14 @@ muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 		return MU_FAILURE;
 	}
 
-	// @TODO handle non-matching data type cases here (including signed/unsigned)
-	for (size_m i = 0; i < src_dt.byte_size && i < dst_dt.byte_size; i++) {
-		context->static_memory[reg1_val+i] = context->reg0[i];
+	if (src_dt.sign == dst_dt.sign && src_dt.type == dst_dt.type) {
+		size_m min_byte_size = src_dt.byte_size;
+		if (dst_dt.byte_size < src_dt.byte_size) {
+			min_byte_size = dst_dt.byte_size;
+		}
+		for (size_m i = 0; i < src_dt.byte_size && i < dst_dt.byte_size; i++) {
+			context->static_memory[reg1_val+min_byte_size-i-1] = context->reg0[src_dt.byte_size-i-1];
+		}
 	}
 	
 	return MU_SUCCESS;
