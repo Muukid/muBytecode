@@ -1179,10 +1179,10 @@ muResult mu_instruction_add(muContext* context, muByte* bytecode) {
 		offset += src1_dt.byte_size;
 	}
 	muicDataType dst_dt = mu_get_data_type_from_bytecode(&bytecode[offset]);
-	mu_context_fill_reg1_with_data_type(context, dst_dt, &bytecode[offset+3]);
+	mu_context_fill_reg2_with_data_type(context, dst_dt, &bytecode[offset+3]);
 
 	// set memory address point stored in reg2 to reg0 + reg1
-
+	
 	uint64_m reg2_val = mu_context_get_reg_pointer_value(context->reg2, context->bitwidth / 8);
 	if ((reg2_val + dst_dt.byte_size > context->static_memory_len) || reg2_val == 0) {
 		mu_print("[MUIC] WARNING! Invalid memory address modification attempt!\n");
