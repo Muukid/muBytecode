@@ -164,6 +164,10 @@ More explicit license information at the end of the file.
 /* structs */
 
 struct muContext {
+	muByte* bytecode;
+	size_m bytecode_len;
+	muByte* bytecode_main;
+
 	muByte bitwidth;
 	size_m static_memory_len;
 	muByte* static_memory;
@@ -548,6 +552,31 @@ muResult mu_instruction_add(muContext* context, muByte* bytecode) {
 	return MU_SUCCESS;
 }
 
+size_m mub_get_step_from_data_type(muContext* context, muByte* bytecode) {
+	size_m step = 3;
+	mubDataType dt0 = mu_get_data_type_from_bytecode(bytecode);
+	if (dt0.pointer_count > 0) {
+		step += context->bitwidth / 8;
+	} else {
+		step += dt0.byte_size;
+	}
+	return step;
+}
+
+muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecode_beginning, size_m bytecode_len) {
+	switch (bytecode[0]) {
+		default: return bytecode + 1; break;
+		// beginning stuff
+		case 0x6D: if (bytecode == bytecode_beginning) { return bytecode + 16; } break;
+		// end stuff
+		case 0x65: if (bytecode + 4 == bytecode_beginning + bytecode_len) { return bytecode + 4; } break;
+		// commands
+		case 0x80: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1) + 3 + (context->bitwidth / 8); return bytecode; break;
+		case 0x81: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1); bytecode += 3 + mub_get_step_from_data_type(context, bytecode+1) + (context->bitwidth / 8); return bytecode; break;
+	}
+	return bytecode + 1;
+}
+
 /* functions */
 
 MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m bytecode_len) {
@@ -574,6 +603,15 @@ MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m byt
 	context.reg1 = MU_NULL_PTR;
 	context.reg2 = MU_NULL_PTR;
 
+	muByte* step = bytecode;
+	while (step < bytecode + bytecode_len) {
+		step = mub_advance_header(&context, step, bytecode, bytecode_len);
+	}
+
+	context.bytecode = mu_malloc(bytecode_len * sizeof(muByte));
+	mu_memcpy(context.bytecode, bytecode, bytecode_len * sizeof(muByte));
+	context.bytecode_len = bytecode_len;
+
 	if (result != MU_NULL_PTR) {
 		*result = MU_SUCCESS;
 	}
@@ -581,6 +619,11 @@ MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m byt
 }
 
 MUDEF muContext mu_context_destroy(muResult* result, muContext context) {
+	if (context.bytecode != MU_NULL_PTR) {
+		mu_free(context.bytecode);
+		context.bytecode = MU_NULL_PTR;
+	}
+
 	if (context.static_memory != MU_NULL_PTR) {
 		mu_free(context.static_memory);
 		context.static_memory = MU_NULL_PTR;
