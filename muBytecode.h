@@ -249,8 +249,8 @@ muResult mu_bytecode_check_header_validity(muByte* bytecode, size_m bytecode_len
 	if (
 		bytecode[0] != mu_binary(01101101) || 
 		bytecode[1] != mu_binary(01110101) || 
-		bytecode[2] != mu_binary(01101001) || 
-		bytecode[3] != mu_binary(01100011)
+		bytecode[2] != mu_binary(01100010) || 
+		bytecode[3] != mu_binary(00000000)
 	) {
 		mu_print("[MUB] Failed to create context; invalid file signature.\n");
 		return MU_FAILURE;
