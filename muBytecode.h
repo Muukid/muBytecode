@@ -358,7 +358,6 @@ muResult mu_context_fill_reg0_with_data_type(muContext* context, mubDataType dt,
 		context->reg0 = mu_malloc(dt.byte_size);
 		context->reg0_len = dt.byte_size;
 	}
-	// @TODO maybe extra out-of-range checking here? and for rest of func
 	if (dt.pointer_count == 0) {
 		mu_memcpy(context->reg0, bytecode, dt.byte_size);
 	} else {
@@ -461,11 +460,11 @@ muResult mu_context_fill_reg2_with_data_type(muContext* context, mubDataType dt,
 muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 	size_m offset = 0;
 
-	// @TODO check for reg fill function results
-	// @TODO make sure we're in range here
 	// obtain value from src_dt into reg0 (pointer=0 means we have actual value)
 	mubDataType src_dt = mu_get_data_type_from_bytecode(bytecode);
-	mu_context_fill_reg0_with_data_type(context, src_dt, &bytecode[3]);
+	if (mu_context_fill_reg0_with_data_type(context, src_dt, &bytecode[3]) != MU_SUCCESS) {
+		return MU_FAILURE;
+	}
 
 	// obtain value from dst_dt into reg1 (pointer=0 means we have pointer to set value at)
 	offset = 0;
@@ -476,7 +475,9 @@ muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 		offset += src_dt.byte_size;
 	}
 	mubDataType dst_dt = mu_get_data_type_from_bytecode(&bytecode[offset]);
-	mu_context_fill_reg1_with_data_type(context, dst_dt, &bytecode[offset+3]);
+	if (mu_context_fill_reg1_with_data_type(context, dst_dt, &bytecode[offset+3]) != MU_SUCCESS) {
+		return MU_FAILURE;
+	}
 
 	// set memory address point stored in reg1 to reg0
 
@@ -502,11 +503,11 @@ muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 muResult mu_instruction_add(muContext* context, muByte* bytecode) {
 	size_m offset = 0;
 
-	// @TODO check for reg fill function results
-	// @TODO make sure we're in range here
 	// obtain value from src0_dt into reg0 (pointer=0 means we have actual value)
 	mubDataType src0_dt = mu_get_data_type_from_bytecode(bytecode);
-	mu_context_fill_reg0_with_data_type(context, src0_dt, &bytecode[3]);
+	if (mu_context_fill_reg0_with_data_type(context, src0_dt, &bytecode[3]) != MU_SUCCESS) {
+		return MU_FAILURE;
+	}
 
 	// obtain value from src1_dt into reg1 (pointer=0 means we have pointer to set value at)
 	offset = 0;
@@ -517,7 +518,9 @@ muResult mu_instruction_add(muContext* context, muByte* bytecode) {
 		offset += src0_dt.byte_size;
 	}
 	mubDataType src1_dt = mu_get_data_type_from_bytecode(&bytecode[offset]);
-	mu_context_fill_reg1_with_data_type(context, src1_dt, &bytecode[offset+3]);
+	if (mu_context_fill_reg1_with_data_type(context, src1_dt, &bytecode[offset+3]) != MU_SUCCESS) {
+		return MU_FAILURE;
+	}
 
 	// obtain value from dst_dt into reg2
 	offset += 3;
@@ -527,7 +530,9 @@ muResult mu_instruction_add(muContext* context, muByte* bytecode) {
 		offset += src1_dt.byte_size;
 	}
 	mubDataType dst_dt = mu_get_data_type_from_bytecode(&bytecode[offset]);
-	mu_context_fill_reg2_with_data_type(context, dst_dt, &bytecode[offset+3]);
+	if (mu_context_fill_reg2_with_data_type(context, dst_dt, &bytecode[offset+3]) != MU_SUCCESS) {
+		return MU_FAILURE;
+	}
 
 	// set memory address point stored in reg2 to reg0 + reg1
 	
@@ -545,11 +550,8 @@ muResult mu_instruction_add(muContext* context, muByte* bytecode) {
 		mu_print("[MIUC] Invalid mathematical operation.\n");
 		return MU_FAILURE;
 	}
-	// @TODO return a failure value if not successfully converted
 	
 	return mub_perform_operation(context, src0_dt, src1_dt, dst_dt, MUB_OPERATION_ADD, reg2_val, reg2_val);
-	
-	return MU_SUCCESS;
 }
 
 size_m mub_get_step_from_data_type(muContext* context, muByte* bytecode) {
@@ -656,10 +658,10 @@ MUDEF muByte mu_string_to_binary(const char* s) {
 	return i;
 }
 
-// @TODO return MU_FAILURE if unable to perform operation
 muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataType src1_dt, mubDataType dst_dt, int operation, int64_m reg1_val, int64_m reg2_val) {
 	switch (operation) {
 		default: {
+			mu_print("[MUB] Failed to perform operation; unrecognized operation.\n");
 			return MU_FAILURE;
 			break;
 		}
@@ -675,14 +677,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -699,14 +701,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -723,14 +725,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -739,12 +741,12 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -761,14 +763,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -777,12 +779,12 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint8_m*)&context->static_memory[reg1_val]) = (uint8_m)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg1_val]) = (int8_m)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -803,14 +805,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -827,14 +829,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -851,14 +853,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -867,12 +869,12 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -889,14 +891,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -905,12 +907,12 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint16_m*)&context->static_memory[reg1_val]) = (uint16_m)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg1_val]) = (int16_m)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -931,14 +933,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -951,8 +953,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -969,14 +971,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -989,8 +991,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1007,14 +1009,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1023,12 +1025,12 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1041,8 +1043,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1051,7 +1053,7 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1068,14 +1070,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1084,12 +1086,12 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint32_m*)&context->static_memory[reg1_val]) = (uint32_m)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg1_val]) = (int32_m)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1102,8 +1104,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg1_val]) = (float)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1112,7 +1114,7 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg1_val]) = (float)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1133,14 +1135,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1153,8 +1155,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint8_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int8_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int8_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1171,14 +1173,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1191,8 +1193,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint16_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int16_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int16_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1209,14 +1211,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1225,12 +1227,12 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1243,8 +1245,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint32_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int32_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int32_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1253,7 +1255,7 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((float*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((float*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1270,14 +1272,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1286,12 +1288,12 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_UNSIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((uint64_m*)&context->static_memory[reg1_val]) = (uint64_m)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg1_val]) = (int64_m)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1304,8 +1306,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint64_m*)&context->reg0[0])); } break;
-														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int64_m*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg1_val]) = (double)(*((uint64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((int64_m*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1314,7 +1316,7 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 											switch (src0_dt.sign) { default: break;
 												case MUB_DATA_TYPE_SIGNED: {
 													switch (dst_dt.sign) { default: break;
-														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((double*)&context->reg0[0])); } break;
+														case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg1_val]) = (double)(*((double*)&context->reg0[0])); return MU_SUCCESS; } break;
 													}
 												} break;
 											}
@@ -1345,14 +1347,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1361,14 +1363,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1393,14 +1395,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1409,14 +1411,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1441,14 +1443,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1457,14 +1459,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1477,14 +1479,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1493,14 +1495,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1525,14 +1527,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1541,14 +1543,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1561,14 +1563,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1577,14 +1579,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1613,14 +1615,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1629,14 +1631,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1661,14 +1663,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1677,14 +1679,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1709,14 +1711,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1725,14 +1727,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1745,14 +1747,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1761,14 +1763,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1793,14 +1795,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1809,14 +1811,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1829,14 +1831,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1845,14 +1847,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1881,14 +1883,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1897,14 +1899,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1921,8 +1923,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1931,8 +1933,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1957,14 +1959,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1973,14 +1975,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -1997,8 +1999,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2007,8 +2009,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2033,14 +2035,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2049,14 +2051,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2069,14 +2071,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2085,14 +2087,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2109,8 +2111,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2119,8 +2121,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2133,8 +2135,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2143,8 +2145,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2169,14 +2171,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2185,14 +2187,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2205,14 +2207,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2221,14 +2223,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2245,8 +2247,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2255,8 +2257,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2269,8 +2271,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2279,8 +2281,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2309,14 +2311,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2325,14 +2327,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2357,14 +2359,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2373,14 +2375,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2405,14 +2407,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2421,14 +2423,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2441,14 +2443,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2457,14 +2459,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2489,14 +2491,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2505,14 +2507,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2525,14 +2527,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2541,14 +2543,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int8_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2581,14 +2583,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2597,14 +2599,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2629,14 +2631,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2645,14 +2647,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2677,14 +2679,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2693,14 +2695,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2713,14 +2715,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2729,14 +2731,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2761,14 +2763,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2777,14 +2779,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2797,14 +2799,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2813,14 +2815,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2849,14 +2851,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2865,14 +2867,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2897,14 +2899,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2913,14 +2915,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2945,14 +2947,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2961,14 +2963,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2981,14 +2983,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -2997,14 +2999,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3029,14 +3031,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3045,14 +3047,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3065,14 +3067,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3081,14 +3083,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3117,14 +3119,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3133,14 +3135,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3165,14 +3167,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3181,14 +3183,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3213,14 +3215,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3229,14 +3231,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3249,14 +3251,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3265,14 +3267,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3289,8 +3291,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3299,8 +3301,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3313,8 +3315,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3323,8 +3325,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3349,14 +3351,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3365,14 +3367,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3385,14 +3387,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3401,14 +3403,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3425,8 +3427,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3435,8 +3437,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3449,8 +3451,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3459,8 +3461,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3489,14 +3491,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3505,14 +3507,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3537,14 +3539,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3553,14 +3555,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3577,8 +3579,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3587,8 +3589,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3613,14 +3615,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3629,14 +3631,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3649,14 +3651,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3665,14 +3667,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3689,8 +3691,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3699,8 +3701,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3713,8 +3715,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3723,8 +3725,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3749,14 +3751,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3765,14 +3767,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3785,14 +3787,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3801,14 +3803,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3825,8 +3827,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3835,8 +3837,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3849,8 +3851,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3859,8 +3861,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int16_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3893,14 +3895,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3909,14 +3911,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3937,14 +3939,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3969,14 +3971,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -3985,14 +3987,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4013,14 +4015,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4045,14 +4047,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4061,14 +4063,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4081,14 +4083,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4097,14 +4099,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4125,14 +4127,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4145,14 +4147,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4177,14 +4179,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4193,14 +4195,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4213,14 +4215,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4229,14 +4231,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4257,14 +4259,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4277,14 +4279,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4313,14 +4315,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4329,14 +4331,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4357,14 +4359,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4389,14 +4391,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4405,14 +4407,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4433,14 +4435,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4465,14 +4467,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4481,14 +4483,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4501,14 +4503,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4517,14 +4519,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4545,14 +4547,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4565,14 +4567,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4597,14 +4599,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4613,14 +4615,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4633,14 +4635,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4649,14 +4651,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4677,14 +4679,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4697,14 +4699,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4733,14 +4735,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4749,14 +4751,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4773,8 +4775,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4783,8 +4785,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4805,14 +4807,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4829,8 +4831,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4855,14 +4857,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4871,14 +4873,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4895,8 +4897,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4905,8 +4907,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4927,14 +4929,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4951,8 +4953,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4977,14 +4979,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -4993,14 +4995,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5013,14 +5015,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5029,14 +5031,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5053,8 +5055,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5063,8 +5065,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5077,8 +5079,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5087,8 +5089,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5109,14 +5111,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5129,14 +5131,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5153,8 +5155,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5167,8 +5169,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5193,14 +5195,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5209,14 +5211,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5229,14 +5231,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5245,14 +5247,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5269,8 +5271,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5279,8 +5281,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5293,8 +5295,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5303,8 +5305,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5325,14 +5327,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5345,14 +5347,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5369,8 +5371,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5383,8 +5385,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5413,14 +5415,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5429,14 +5431,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5453,8 +5455,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5463,8 +5465,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5485,14 +5487,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5509,8 +5511,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5535,14 +5537,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5551,14 +5553,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5575,8 +5577,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5585,8 +5587,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5607,14 +5609,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5631,8 +5633,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5657,14 +5659,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5673,14 +5675,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5693,14 +5695,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5709,14 +5711,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5733,8 +5735,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5743,8 +5745,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5757,8 +5759,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5767,8 +5769,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5789,14 +5791,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5809,14 +5811,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5833,8 +5835,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5847,8 +5849,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5873,14 +5875,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5889,14 +5891,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5909,14 +5911,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5925,14 +5927,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5949,8 +5951,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5959,8 +5961,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5973,8 +5975,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -5983,8 +5985,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int32_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6005,14 +6007,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6025,14 +6027,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6049,8 +6051,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6063,8 +6065,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((float*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6097,14 +6099,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6113,14 +6115,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6141,14 +6143,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6173,14 +6175,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6189,14 +6191,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6217,14 +6219,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6249,14 +6251,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6265,14 +6267,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6285,14 +6287,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6301,14 +6303,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6329,14 +6331,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6349,14 +6351,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6381,14 +6383,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6397,14 +6399,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6417,14 +6419,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6433,14 +6435,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6461,14 +6463,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6481,14 +6483,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int8_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6517,14 +6519,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6533,14 +6535,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6561,14 +6563,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6593,14 +6595,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6609,14 +6611,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6637,14 +6639,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6669,14 +6671,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6685,14 +6687,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6705,14 +6707,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6721,14 +6723,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6749,14 +6751,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6769,14 +6771,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6801,14 +6803,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6817,14 +6819,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6837,14 +6839,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6853,14 +6855,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6881,14 +6883,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6901,14 +6903,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int16_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6937,14 +6939,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6953,14 +6955,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6977,8 +6979,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -6987,8 +6989,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7009,14 +7011,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7033,8 +7035,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7059,14 +7061,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7075,14 +7077,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7099,8 +7101,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7109,8 +7111,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7131,14 +7133,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7155,8 +7157,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7181,14 +7183,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7197,14 +7199,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7217,14 +7219,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7233,14 +7235,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7257,8 +7259,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7267,8 +7269,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7281,8 +7283,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7291,8 +7293,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7313,14 +7315,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7333,14 +7335,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7357,8 +7359,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7371,8 +7373,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7397,14 +7399,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7413,14 +7415,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7433,14 +7435,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7449,14 +7451,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7473,8 +7475,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7483,8 +7485,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7497,8 +7499,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7507,8 +7509,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7529,14 +7531,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7549,14 +7551,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int32_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7573,8 +7575,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7587,8 +7589,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((float*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7617,14 +7619,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7633,14 +7635,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7657,8 +7659,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7667,8 +7669,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7689,14 +7691,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7713,8 +7715,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint8_m*)&context->static_memory[reg2_val]) = (uint8_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int8_m*)&context->static_memory[reg2_val]) = (int8_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7739,14 +7741,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7755,14 +7757,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7779,8 +7781,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7789,8 +7791,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7811,14 +7813,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7835,8 +7837,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint16_m*)&context->static_memory[reg2_val]) = (uint16_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int16_m*)&context->static_memory[reg2_val]) = (int16_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7861,14 +7863,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7877,14 +7879,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7897,14 +7899,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7913,14 +7915,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7937,8 +7939,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7947,8 +7949,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7961,8 +7963,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7971,8 +7973,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -7993,14 +7995,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8013,14 +8015,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8037,8 +8039,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint32_m*)&context->static_memory[reg2_val]) = (uint32_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int32_m*)&context->static_memory[reg2_val]) = (int32_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8051,8 +8053,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((float*)&context->static_memory[reg2_val]) = (float)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8077,14 +8079,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8093,14 +8095,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8113,14 +8115,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8129,14 +8131,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8153,8 +8155,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8163,8 +8165,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8177,8 +8179,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((uint64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8187,8 +8189,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((int64_m*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8209,14 +8211,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8229,14 +8231,14 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_UNSIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((uint64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((int64_m*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8253,8 +8255,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((uint64_m*)&context->static_memory[reg2_val]) = (uint64_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((int64_m*)&context->static_memory[reg2_val]) = (int64_m)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8267,8 +8269,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 																	switch (src1_dt.sign) { default: break;
 																		case MUB_DATA_TYPE_SIGNED: {
 																			switch (dst_dt.sign) { default: break;
-																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
-																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); } break;
+																				case MUB_DATA_TYPE_UNSIGNED: { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
+																				case MUB_DATA_TYPE_SIGNED:   { *((double*)&context->static_memory[reg2_val]) = (double)(*((double*)&context->reg0[0]) + *((double*)&context->reg1[0])); return MU_SUCCESS; } break;
 																			}
 																		} break;
 																	}
@@ -8289,7 +8291,8 @@ muResult mub_perform_operation(muContext* context, mubDataType src0_dt, mubDataT
 		} break;
 	}
 
-	return MU_SUCCESS;
+	mu_print("[MUB] Failed to perform operation; invalid conversion request.\n");
+	return MU_FAILURE;
 }
 
 #ifdef __cplusplus
