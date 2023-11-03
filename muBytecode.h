@@ -575,6 +575,26 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 		// commands
 		case 0x80: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1) + 3 + (context->bitwidth / 8); return bytecode; break;
 		case 0x81: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1); bytecode += 3 + mub_get_step_from_data_type(context, bytecode+1) + (context->bitwidth / 8); return bytecode; break;
+		// jump markers
+		case 0xF0: {
+			muByte* orig = bytecode;
+			bytecode++;
+			uint64_m val = 1;
+			switch (context->bitwidth) {
+				case 8:  val = *((uint8_m*) bytecode); bytecode ++;   break;
+				case 16: val = *((uint16_m*)bytecode); bytecode += 2; break;
+				case 32: val = *((uint32_m*)bytecode); bytecode += 4; break;
+				case 64: val = *((uint64_m*)bytecode); bytecode += 8; break;
+			}
+			if (val == 0) {
+				context->bytecode_main = orig;
+			}
+			return bytecode;
+		} break;
+		case 0xF1: {
+			bytecode++;
+			return bytecode;
+		} break;
 	}
 	return bytecode + 1;
 }
