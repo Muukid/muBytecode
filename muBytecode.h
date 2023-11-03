@@ -167,6 +167,7 @@ struct muContext {
 	muByte* bytecode;
 	size_m bytecode_len;
 	muByte* bytecode_main;
+	int32_m main_return;
 
 	muByte bitwidth;
 	size_m static_memory_len;
@@ -236,6 +237,25 @@ uint32_m mu_get_uint32_from_bytecode(muByte* bytecode) {
 uint64_m mu_get_uint64_from_bytecode(muByte* bytecode) {
 	muByte static_memory_len_bytes[8] = { bytecode[7], bytecode[6], bytecode[5], bytecode[4], bytecode[3], bytecode[2], bytecode[1], bytecode[0] };
 	return (*(uint64_m*)&static_memory_len_bytes[0]);
+}
+
+int8_m mu_get_int8_from_bytecode(muByte* bytecode) {
+	return bytecode[0];
+}
+
+int16_m mu_get_int16_from_bytecode(muByte* bytecode) {
+	muByte static_memory_len_bytes[2] = { bytecode[1], bytecode[0] };
+	return (*(int16_m*)&static_memory_len_bytes[0]);
+}
+
+int32_m mu_get_int32_from_bytecode(muByte* bytecode) {
+	muByte static_memory_len_bytes[4] = { bytecode[3], bytecode[2], bytecode[1], bytecode[0] };
+	return (*(int32_m*)&static_memory_len_bytes[0]);
+}
+
+int64_m mu_get_int64_from_bytecode(muByte* bytecode) {
+	muByte static_memory_len_bytes[8] = { bytecode[7], bytecode[6], bytecode[5], bytecode[4], bytecode[3], bytecode[2], bytecode[1], bytecode[0] };
+	return (*(int64_m*)&static_memory_len_bytes[0]);
 }
 
 muResult mu_bytecode_check_header_validity(muByte* bytecode, size_m bytecode_len) {
@@ -352,6 +372,26 @@ uint64_m mu_context_get_reg_pointer_value(muByte* reg, size_m reg_len) {
 	}
 }
 
+int64_m mu_context_get_reg_pointer_signed_value(muByte* reg, size_m reg_len) {
+	switch (reg_len) {
+	default:
+		return 0;
+		break;
+	case 1:
+		return mu_get_int8_from_bytecode(reg);
+		break;
+	case 2:
+		return mu_get_int16_from_bytecode(reg);
+		break;
+	case 4:
+		return mu_get_int32_from_bytecode(reg);
+		break;
+	case 8:
+		return mu_get_int64_from_bytecode(reg);
+		break;
+	}
+}
+
 muResult mu_context_fill_reg0_with_data_type(muContext* context, mubDataType dt, muByte* bytecode) {
 	if ((context->reg0 == MU_NULL_PTR) || (context->reg0_len < dt.byte_size)) {
 		if (context->reg0 != MU_NULL_PTR) {
@@ -458,6 +498,18 @@ muResult mu_context_fill_reg2_with_data_type(muContext* context, mubDataType dt,
 }
 
 // instructions
+
+muResult mu_instruction_return_main(muContext* context, muByte* bytecode) {
+	mubDataType src_dt = mu_get_data_type_from_bytecode(bytecode);
+	if (mu_context_fill_reg0_with_data_type(context, src_dt, &bytecode[3]) != MU_SUCCESS) {
+		return MU_FAILURE;
+	}
+	
+	int32_m reg0_val = mu_context_get_reg_pointer_signed_value(context->reg0, src_dt.byte_size);
+	context->main_return = reg0_val;
+	
+	return MU_SUCCESS;
+}
 
 muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 	size_m offset = 0;
@@ -570,13 +622,14 @@ size_m mub_get_step_from_data_type(muContext* context, muByte* bytecode) {
 muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecode_beginning, size_m bytecode_len) {
 	switch (bytecode[0]) {
 		default: return bytecode + 1; break;
+		case 0x00: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1); return bytecode; break;
 		// beginning stuff
 		case 0x6D: if (bytecode == bytecode_beginning) { return bytecode + 16; } break;
 		// end stuff
 		case 0x65: if (bytecode + 4 == bytecode_beginning + bytecode_len) { return bytecode + 4; } break;
 		// commands
 		case 0x80: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1) + 3 + (context->bitwidth / 8); return bytecode; break;
-		case 0x81: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1); bytecode += 3 + mub_get_step_from_data_type(context, bytecode+1) + (context->bitwidth / 8); return bytecode; break;
+		case 0x81: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1);  bytecode += mub_get_step_from_data_type(context, bytecode) + 3 + (context->bitwidth / 8); return bytecode; break;
 		// jump markers
 		case 0xF0: {
 			bytecode++;
@@ -602,6 +655,7 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 
 muResult mub_execute_command(muContext* context, muByte* bytecode) {
 	switch (bytecode[0]) { default: break;
+	case 0x00: return mu_instruction_return_main(context, bytecode+1); break;
 	case 0x80: return mu_instruction_move(context, bytecode+1); break;
 	case 0x81: return mu_instruction_add(context, bytecode+1); break;
 	}
@@ -623,7 +677,9 @@ MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m byt
 
 	context.bitwidth = bytecode[4];
 	context.static_memory_len = mu_get_uint32_from_bytecode(&bytecode[8]);
+
 	context.bytecode_main = MU_NULL_PTR;
+	context.main_return = 0;
 
 	if (context.static_memory_len > 0) {
 		context.static_memory = mu_malloc(context.static_memory_len * sizeof(muByte));
@@ -703,6 +759,9 @@ MUDEF int mu_context_execute_main(muResult* result, muContext* context) {
 				*result = MU_FAILURE;
 			}
 			return 0;
+		}
+		if (step[0] == 0x00) {
+			return context->main_return;
 		}
 		step = mub_advance_header(context, step, context->bytecode, context->bytecode_len);
 	}
