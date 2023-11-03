@@ -202,6 +202,8 @@ typedef struct muContext muContext;
 MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m bytecode_len);
 MUDEF muContext mu_context_destroy(muResult* result, muContext context);
 
+MUDEF int mu_context_execute_main(muResult* result, muContext* context);
+
 // binary/bit/byte handling
 MUDEF muByte mu_string_to_binary(const char* s);
 
@@ -577,7 +579,6 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 		case 0x81: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1); bytecode += 3 + mub_get_step_from_data_type(context, bytecode+1) + (context->bitwidth / 8); return bytecode; break;
 		// jump markers
 		case 0xF0: {
-			muByte* orig = bytecode;
 			bytecode++;
 			uint64_m val = 1;
 			switch (context->bitwidth) {
@@ -587,7 +588,7 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 				case 64: val = *((uint64_m*)bytecode); bytecode += 8; break;
 			}
 			if (val == 0) {
-				context->bytecode_main = orig;
+				context->bytecode_main = bytecode;
 			}
 			return bytecode;
 		} break;
@@ -597,6 +598,15 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 		} break;
 	}
 	return bytecode + 1;
+}
+
+muResult mub_execute_command(muContext* context, muByte* bytecode) {
+	switch (bytecode[0]) { default: break;
+	case 0x80: return mu_instruction_move(context, bytecode+1); break;
+	case 0x81: return mu_instruction_add(context, bytecode+1); break;
+	}
+	mu_print("[MUB] Unrecognized command when executing.\n");
+	return MU_FAILURE;
 }
 
 /* functions */
@@ -613,6 +623,7 @@ MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m byt
 
 	context.bitwidth = bytecode[4];
 	context.static_memory_len = mu_get_uint32_from_bytecode(&bytecode[8]);
+	context.bytecode_main = MU_NULL_PTR;
 
 	if (context.static_memory_len > 0) {
 		context.static_memory = mu_malloc(context.static_memory_len * sizeof(muByte));
@@ -625,14 +636,14 @@ MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m byt
 	context.reg1 = MU_NULL_PTR;
 	context.reg2 = MU_NULL_PTR;
 
-	muByte* step = bytecode;
-	while (step < bytecode + bytecode_len) {
-		step = mub_advance_header(&context, step, bytecode, bytecode_len);
-	}
-
 	context.bytecode = mu_malloc(bytecode_len * sizeof(muByte));
 	mu_memcpy(context.bytecode, bytecode, bytecode_len * sizeof(muByte));
 	context.bytecode_len = bytecode_len;
+
+	muByte* step = context.bytecode;
+	while (step < context.bytecode + context.bytecode_len) {
+		step = mub_advance_header(&context, step, context.bytecode, context.bytecode_len);
+	}
 
 	if (result != MU_NULL_PTR) {
 		*result = MU_SUCCESS;
@@ -666,7 +677,41 @@ MUDEF muContext mu_context_destroy(muResult* result, muContext context) {
 		context.reg2 = MU_NULL_PTR;
 	}
 
+	if (result != MU_NULL_PTR) {
+		*result = MU_SUCCESS;
+	}
+
 	return context;
+}
+
+MUDEF int mu_context_execute_main(muResult* result, muContext* context) {
+	if (context->bytecode_main == MU_NULL_PTR) {
+		mu_print("[MUB] Failed to execute main; no main specified in the bytecode.\n");
+		if (result != MU_NULL_PTR) {
+			*result = MU_FAILURE;
+		}
+		return 0;
+	}
+
+	muByte* step = context->bytecode_main;
+	while (step < context->bytecode + context->bytecode_len) {
+		if (step[0] == 0xF1) {
+			break;
+		}
+		if (mub_execute_command(context, step) != MU_SUCCESS) {
+			if (result != MU_NULL_PTR) {
+				*result = MU_FAILURE;
+			}
+			return 0;
+		}
+		step = mub_advance_header(context, step, context->bytecode, context->bytecode_len);
+	}
+
+	if (result != MU_NULL_PTR) {
+		*result = MU_SUCCESS;
+	}
+
+	return 0;
 }
 
 MUDEF muByte mu_string_to_binary(const char* s) {
