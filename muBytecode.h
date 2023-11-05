@@ -228,6 +228,8 @@ struct muContext {
 	muByte* bytecode_main;
 	int32_m main_return;
 
+	muResult last_if;
+
 	muByte bitwidth;
 	size_m static_memory_len;
 	muByte* static_memory;
@@ -660,10 +662,11 @@ muResult mu_instruction_print(muContext* context, muByte* bytecode) {
 				setlocale_m(MU_LC_ALL, "");
 				printf("%ls", arr);
 			}
+			return MU_SUCCESS;
 		} break;
 	}
 
-	return MU_SUCCESS;
+	return MU_FAILURE;
 }
 
 muResult mu_instruction_move(muContext* context, muByte* bytecode) {
@@ -763,6 +766,22 @@ muResult mu_instruction_add(muContext* context, muByte* bytecode) {
 	return mub_perform_operation(context, src0_dt, src1_dt, dst_dt, MUB_OPERATION_ADD, reg2_val, reg2_val);
 }
 
+muResult mu_instruction_if(muContext* context, muByte* bytecode) {
+	mubDataType src_dt = mu_get_data_type_from_bytecode(bytecode);
+	if (mu_context_fill_reg0_with_data_type(context, src_dt, &bytecode[3]) != MU_SUCCESS) {
+		return MU_FAILURE;
+	}
+
+	context->last_if = MU_FALSE;
+	for (size_m i = 0; i < context->reg0_len; i++) {
+		if (context->reg0[i] != 0) {
+			context->last_if = MU_TRUE;
+		}
+	}
+
+	return MU_SUCCESS;
+}
+
 size_m mub_get_step_from_data_type(muContext* context, muByte* bytecode) {
 	size_m step = 3;
 	mubDataType dt0 = mu_get_data_type_from_bytecode(bytecode);
@@ -805,6 +824,9 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 			bytecode++;
 			return bytecode;
 		} break;
+		case 0xA0: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1); return bytecode; break;
+		case 0xA1: bytecode++; return bytecode; break;
+		case 0xA2: bytecode++; return bytecode; break;
 	}
 	return bytecode + 1;
 }
@@ -815,6 +837,8 @@ muResult mub_execute_command(muContext* context, muByte* bytecode) {
 	case 0x01: return mu_instruction_print(context, bytecode+1); break;
 	case 0x80: return mu_instruction_move(context, bytecode+1); break;
 	case 0x81: return mu_instruction_add(context, bytecode+1); break;
+	case 0xA0: return mu_instruction_if(context, bytecode+1); break;
+	case 0xA1: return MU_SUCCESS; break;
 	}
 	mu_print("[MUB] Unrecognized command when executing.\n");
 	return MU_FAILURE;
@@ -837,6 +861,8 @@ MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m byt
 
 	context.bytecode_main = MU_NULL_PTR;
 	context.main_return = 0;
+
+	context.last_if = MU_FALSE;
 
 	if (context.static_memory_len > 0) {
 		context.static_memory = mu_malloc(context.static_memory_len * sizeof(muByte));
@@ -911,16 +937,32 @@ MUDEF int mu_context_execute_main(muResult* result, muContext* context) {
 		if (step[0] == 0xF1) {
 			break;
 		}
+		muBool ifCheck = MU_FALSE;
+		if (step[0] == 0xA0) {
+			ifCheck = MU_TRUE;
+		}
 		if (mub_execute_command(context, step) != MU_SUCCESS) {
 			if (result != MU_NULL_PTR) {
 				*result = MU_FAILURE;
 			}
 			return 0;
 		}
-		if (step[0] == 0x00) {
-			return context->main_return;
+		if (ifCheck && context->last_if == MU_FALSE) {
+			size_m if_count = 1;
+			while (if_count != 0 && step < context->bytecode + context->bytecode_len) {
+				step = mub_advance_header(context, step, context->bytecode, context->bytecode_len);
+				if (step[0] == 0xA0) {
+					if_count++;
+				} else if (step[0] == 0xA1) {
+					if_count--;
+				}
+			}
+		} else {
+			if (step[0] == 0x00) {
+				return context->main_return;
+			}
+			step = mub_advance_header(context, step, context->bytecode, context->bytecode_len);
 		}
-		step = mub_advance_header(context, step, context->bytecode, context->bytecode_len);
 	}
 
 	if (result != MU_NULL_PTR) {
