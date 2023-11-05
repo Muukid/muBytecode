@@ -839,6 +839,7 @@ muResult mub_execute_command(muContext* context, muByte* bytecode) {
 	case 0x81: return mu_instruction_add(context, bytecode+1); break;
 	case 0xA0: return mu_instruction_if(context, bytecode+1); break;
 	case 0xA1: return MU_SUCCESS; break;
+	case 0xA2: return MU_SUCCESS; break;
 	}
 	mu_print("[MUB] Unrecognized command when executing.\n");
 	return MU_FAILURE;
@@ -947,15 +948,22 @@ MUDEF int mu_context_execute_main(muResult* result, muContext* context) {
 			}
 			return 0;
 		}
-		if (ifCheck && context->last_if == MU_FALSE) {
+		if ((ifCheck && context->last_if == MU_FALSE) || step[0] == 0xA2) {
 			size_m if_count = 1;
 			while (if_count != 0 && step < context->bytecode + context->bytecode_len) {
 				step = mub_advance_header(context, step, context->bytecode, context->bytecode_len);
-				if (step[0] == 0xA0) {
+				if (step[0] == 0xA0 || step[0] == 0xA2) {
 					if_count++;
 				} else if (step[0] == 0xA1) {
 					if_count--;
 				}
+			}
+			// @TODO Thoroughly test if this causes issues;
+			// my train of thought is that this method ignores the ending '0xA0'
+			// which may cause miscounts, but as far as I can tell, that would only apply
+			// to thie above code. dunno.
+			if (step[1] == 0xA2) {
+				step += 2;
 			}
 		} else {
 			if (step[0] == 0x00) {
