@@ -177,6 +177,24 @@ More explicit license information at the end of the file.
 
 #endif
 
+#if !defined(setlocale_m) || \
+	!defined(MU_LC_ALL)
+
+	#include <locale.h>
+	#ifndef setlocale_m
+		#define setlocale_m setlocale
+	#endif
+
+	#ifndef MU_LC_ALL
+		#define MU_LC_ALL LC_ALL
+	#endif
+#endif
+
+#ifndef wchar_m
+	#include <wchar.h>
+	#define wchar_m wchar_t
+#endif
+
 /* basic types/defines */
 
 #ifndef MU_BOOL
@@ -555,63 +573,92 @@ muResult mu_instruction_return_main(muContext* context, muByte* bytecode) {
 
 // @TODO implement spec
 muResult mu_instruction_print(muContext* context, muByte* bytecode) {
+	size_m offset = 0;
 	mubDataType src_dt = mu_get_data_type_from_bytecode(bytecode);
 	if (mu_context_fill_reg0_with_data_type(context, src_dt, &bytecode[3]) != MU_SUCCESS) {
 		return MU_FAILURE;
 	}
 
-	switch (src_dt.byte_size) { default: break;
-		case 1: {
-			switch (src_dt.type) { default: break;
-				case MUB_DATA_TYPE_INTEGER: {
-					switch (src_dt.sign) { default: break;
-						case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu8_m"", *(uint8_m*)context->reg0); return MU_SUCCESS; } break;
-						case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId8_m"", *(int8_m*) context->reg0); return MU_SUCCESS; } break;
+	offset = 0;
+	offset += 3;
+	if (src_dt.pointer_count > 0) {
+		offset += context->bitwidth / 8;
+	} else {
+		offset += src_dt.byte_size;
+	}
+	muByte spec_byte = bytecode[offset];
+	muByte type = (mu_bitcheck(spec_byte, 7) * 2) + mu_bitcheck(spec_byte, 6);
+
+	switch (type) { default: break;
+		// print integer / decimal
+		case 0: { case 1: {
+			switch (src_dt.byte_size) { default: break;
+				case 1: {
+					switch (src_dt.type) { default: break;
+						case MUB_DATA_TYPE_INTEGER: {
+							switch (src_dt.sign) { default: break;
+								case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu8_m"", *(uint8_m*)context->reg0); return MU_SUCCESS; } break;
+								case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId8_m"", *(int8_m*) context->reg0); return MU_SUCCESS; } break;
+							}
+						} break;
+					}
+				} break;
+				case 2: {
+					switch (src_dt.type) { default: break;
+						case MUB_DATA_TYPE_INTEGER: {
+							switch (src_dt.sign) { default: break;
+								case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu16_m"", *(uint16_m*)context->reg0); return MU_SUCCESS; } break;
+								case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId16_m"", *(int16_m*) context->reg0); return MU_SUCCESS; } break;
+							}
+						} break;
+					}
+				} break;
+				case 4: {
+					switch (src_dt.type) { default: break;
+						case MUB_DATA_TYPE_INTEGER: {
+							switch (src_dt.sign) { default: break;
+								case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu32_m"", *(uint32_m*)context->reg0); return MU_SUCCESS; } break;
+								case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId32_m"", *(int32_m*) context->reg0); return MU_SUCCESS; } break;
+							}
+						} break;
+						case MUB_DATA_TYPE_DECIMAL: {
+							switch (src_dt.sign) { default: break;
+								case MUB_DATA_TYPE_SIGNED:   { printf("%f", *(float*) context->reg0); return MU_SUCCESS; } break;
+							}
+						} break;
+					}
+				} break;
+				case 8: {
+					switch (src_dt.type) { default: break;
+						case MUB_DATA_TYPE_INTEGER: {
+							switch (src_dt.sign) { default: break;
+								// @TODO kill Microsoft
+								#if !defined(_WIN32) && !defined(WIN32)
+									case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu64_m"", *(uint64_m*)context->reg0); return MU_SUCCESS; } break;
+									case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId64_m"", *(int64_m*) context->reg0); return MU_SUCCESS; } break;
+								#endif
+							}
+						} break;
+						case MUB_DATA_TYPE_DECIMAL: {
+							switch (src_dt.sign) { default: break;
+								case MUB_DATA_TYPE_SIGNED:   { printf("%f", *(double*) context->reg0); return MU_SUCCESS; } break;
+							}
+						} break;
 					}
 				} break;
 			}
-		} break;
+		} break; } break;
+		// print character
 		case 2: {
-			switch (src_dt.type) { default: break;
-				case MUB_DATA_TYPE_INTEGER: {
-					switch (src_dt.sign) { default: break;
-						case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu16_m"", *(uint16_m*)context->reg0); return MU_SUCCESS; } break;
-						case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId16_m"", *(int16_m*) context->reg0); return MU_SUCCESS; } break;
-					}
-				} break;
-			}
-		} break;
-		case 4: {
-			switch (src_dt.type) { default: break;
-				case MUB_DATA_TYPE_INTEGER: {
-					switch (src_dt.sign) { default: break;
-						case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu32_m"", *(uint32_m*)context->reg0); return MU_SUCCESS; } break;
-						case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId32_m"", *(int32_m*) context->reg0); return MU_SUCCESS; } break;
-					}
-				} break;
-				case MUB_DATA_TYPE_DECIMAL: {
-					switch (src_dt.sign) { default: break;
-						case MUB_DATA_TYPE_SIGNED:   { printf("%f", *(float*) context->reg0); return MU_SUCCESS; } break;
-					}
-				} break;
-			}
-		} break;
-		case 8: {
-			switch (src_dt.type) { default: break;
-				case MUB_DATA_TYPE_INTEGER: {
-					switch (src_dt.sign) { default: break;
-						// @TODO kill Microsoft
-						#if !defined(_WIN32) && !defined(WIN32)
-							case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu64_m"", *(uint64_m*)context->reg0); return MU_SUCCESS; } break;
-							case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId64_m"", *(int64_m*) context->reg0); return MU_SUCCESS; } break;
-						#endif
-					}
-				} break;
-				case MUB_DATA_TYPE_DECIMAL: {
-					switch (src_dt.sign) { default: break;
-						case MUB_DATA_TYPE_SIGNED:   { printf("%f", *(double*) context->reg0); return MU_SUCCESS; } break;
-					}
-				} break;
+			if (src_dt.byte_size == 1) {
+				char arr[2] = { context->reg0[0], '\0' };
+				printf(arr);
+			} else {
+				// @TODO test if this works
+				uint64_m reg0_val = mu_context_get_reg_pointer_value(context->reg0, src_dt.byte_size);
+				wchar_m arr[2] = { reg0_val, '\0' };
+				setlocale_m(MU_LC_ALL, "");
+				printf("%ls", arr);
 			}
 		} break;
 	}
