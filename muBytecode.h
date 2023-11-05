@@ -136,6 +136,47 @@ More explicit license information at the end of the file.
 
 #endif
 
+#if !defined(PRIu8_m)  || \
+	!defined(PRId8_m)  || \
+	!defined(PRIu16_m) || \
+	!defined(PRId16_m) || \
+	!defined(PRIu32_m) || \
+	!defined(PRId32_m) || \
+	!defined(PRIu64_m) || \
+	!defined(PRId64_m)
+
+	#include <inttypes.h>
+
+	#ifndef PRIu8_m
+		#define PRIu8_m PRIu8
+	#endif
+	#ifndef PRId8_m
+		#define PRId8_m PRId8
+	#endif
+
+	#ifndef PRIu16_m
+		#define PRIu16_m PRIu16
+	#endif
+	#ifndef PRId16_m
+		#define PRId16_m PRId16
+	#endif
+
+	#ifndef PRIu32_m
+		#define PRIu32_m PRIu32
+	#endif
+	#ifndef PRId32_m
+		#define PRId32_m PRId32
+	#endif
+
+	#ifndef PRIu64_m
+		#define PRIu64_m PRIu64
+	#endif
+	#ifndef PRId64_m
+		#define PRId64_m PRId64
+	#endif
+
+#endif
+
 /* basic types/defines */
 
 #ifndef MU_BOOL
@@ -315,6 +356,7 @@ muResult mu_bytecode_check_header_validity(muByte* bytecode, size_m bytecode_len
 struct mubDataType {
 	muBool sign;
 	muByte type;
+	muByte temp;
 	muByte pointer_count;
 	uint16_m byte_size;
 };
@@ -334,11 +376,11 @@ mubDataType mu_get_data_type_from_bytecode(muByte* bytecode) {
 
 	dt.sign = mu_bitcheck(bytecode[0], 7);
 	dt.type = mu_bitcheck(bytecode[0], 5) + (mu_bitcheck(bytecode[0], 6) * 2);
+	dt.temp = mu_bitcheck(bytecode[0], 4);
 	dt.pointer_count = mu_bitcheck(bytecode[0], 0) + 
 	(mu_bitcheck(bytecode[0], 1) * 2) +
 	(mu_bitcheck(bytecode[0], 2) * 4) +
-	(mu_bitcheck(bytecode[0], 3) * 8) +
-	(mu_bitcheck(bytecode[0], 4) * 16);
+	(mu_bitcheck(bytecode[0], 3) * 8);
 	dt.byte_size = mu_get_uint16_from_bytecode(&bytecode[1]);
 
 	return dt;
@@ -511,6 +553,72 @@ muResult mu_instruction_return_main(muContext* context, muByte* bytecode) {
 	return MU_SUCCESS;
 }
 
+// @TODO implement spec
+muResult mu_instruction_print(muContext* context, muByte* bytecode) {
+	mubDataType src_dt = mu_get_data_type_from_bytecode(bytecode);
+	if (mu_context_fill_reg0_with_data_type(context, src_dt, &bytecode[3]) != MU_SUCCESS) {
+		return MU_FAILURE;
+	}
+
+	switch (src_dt.byte_size) { default: break;
+		case 1: {
+			switch (src_dt.type) { default: break;
+				case MUB_DATA_TYPE_INTEGER: {
+					switch (src_dt.sign) { default: break;
+						case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu8_m"", *(uint8_m*)context->reg0); return MU_SUCCESS; } break;
+						case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId8_m"", *(int8_m*) context->reg0); return MU_SUCCESS; } break;
+					}
+				} break;
+			}
+		} break;
+		case 2: {
+			switch (src_dt.type) { default: break;
+				case MUB_DATA_TYPE_INTEGER: {
+					switch (src_dt.sign) { default: break;
+						case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu16_m"", *(uint16_m*)context->reg0); return MU_SUCCESS; } break;
+						case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId16_m"", *(int16_m*) context->reg0); return MU_SUCCESS; } break;
+					}
+				} break;
+			}
+		} break;
+		case 4: {
+			switch (src_dt.type) { default: break;
+				case MUB_DATA_TYPE_INTEGER: {
+					switch (src_dt.sign) { default: break;
+						case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu32_m"", *(uint32_m*)context->reg0); return MU_SUCCESS; } break;
+						case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId32_m"", *(int32_m*) context->reg0); return MU_SUCCESS; } break;
+					}
+				} break;
+				case MUB_DATA_TYPE_DECIMAL: {
+					switch (src_dt.sign) { default: break;
+						case MUB_DATA_TYPE_SIGNED:   { printf("%f", *(float*) context->reg0); return MU_SUCCESS; } break;
+					}
+				} break;
+			}
+		} break;
+		case 8: {
+			switch (src_dt.type) { default: break;
+				case MUB_DATA_TYPE_INTEGER: {
+					switch (src_dt.sign) { default: break;
+						// @TODO kill Microsoft
+						#if !defined(_WIN32) && !defined(WIN32)
+							case MUB_DATA_TYPE_UNSIGNED: { printf("%"PRIu64_m"", *(uint64_m*)context->reg0); return MU_SUCCESS; } break;
+							case MUB_DATA_TYPE_SIGNED:   { printf("%"PRId64_m"", *(int64_m*) context->reg0); return MU_SUCCESS; } break;
+						#endif
+					}
+				} break;
+				case MUB_DATA_TYPE_DECIMAL: {
+					switch (src_dt.sign) { default: break;
+						case MUB_DATA_TYPE_SIGNED:   { printf("%f", *(double*) context->reg0); return MU_SUCCESS; } break;
+					}
+				} break;
+			}
+		} break;
+	}
+
+	return MU_SUCCESS;
+}
+
 muResult mu_instruction_move(muContext* context, muByte* bytecode) {
 	size_m offset = 0;
 
@@ -623,6 +731,7 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 	switch (bytecode[0]) {
 		default: return bytecode + 1; break;
 		case 0x00: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1); return bytecode; break;
+		case 0x01: bytecode += 1 + mub_get_step_from_data_type(context, bytecode+1) + 1; return bytecode; break;
 		// beginning stuff
 		case 0x6D: if (bytecode == bytecode_beginning) { return bytecode + 16; } break;
 		// end stuff
@@ -656,6 +765,7 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 muResult mub_execute_command(muContext* context, muByte* bytecode) {
 	switch (bytecode[0]) { default: break;
 	case 0x00: return mu_instruction_return_main(context, bytecode+1); break;
+	case 0x01: return mu_instruction_print(context, bytecode+1); break;
 	case 0x80: return mu_instruction_move(context, bytecode+1); break;
 	case 0x81: return mu_instruction_add(context, bytecode+1); break;
 	}
