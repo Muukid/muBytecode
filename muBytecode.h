@@ -668,8 +668,13 @@ muResult mu_instruction_print(muContext* context, muByte* bytecode) {
 		// print character
 		case 2: {
 			if (src_dt.byte_size == 1) {
-				char arr[2] = { context->reg0[0], '\0' };
-				printf(arr);
+				if (context->reg0[0] != '%') {
+					char arr[2] = { context->reg0[0], '\0' };
+					printf(arr);
+				} else {
+					char arr[3] = { context->reg0[0], context->reg0[0], '\0' };
+					printf(arr);
+				}
 			} else {
 				// @TODO test if this works
 				uint64_m reg0_val = mu_context_get_reg_pointer_value(context->reg0, src_dt.byte_size);
