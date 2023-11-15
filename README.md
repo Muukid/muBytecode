@@ -29,6 +29,10 @@ Near the top of the file, the version of mub is defined with `MUB_VERSION_MAJOR`
 
 Defining `MU_STATIC` before including `muBytecode.h` will set all the definitions of the functions to static. Otherwise, it defaults to extern. Additionally, you can define `MUDEF` directly to have full control over its definition.
 
+## Quick compile
+
+In order to quickly compile mub for basic testing purposes, define `MUB_QUICK_COMPILE` before including `muBytecode.h`. But note that this will exclude the modulo operator, the bitwise operators, and all conditional storing operators!
+
 ## C standard library dependencies
 
 mub relies on several C standard library functions, types, and defines. The list of types can be found below:
