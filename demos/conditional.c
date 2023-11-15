@@ -6,7 +6,7 @@
 DEMO NAME:          conditional.c
 DEMO WRITTEN BY:    mukid (hum)
 CREATION DATE:      2023-11-14
-LAST UPDATED:       2023-11-14
+LAST UPDATED:       2023-11-15
 
 ============================================================
                         DEMO PURPOSE
@@ -46,7 +46,7 @@ int main() {
         mu_binary(00000000), 1,            0,            0,
         // static memory allocation bytes
         0, 0, 0, 16,
-        // extra settings data
+        // temp memory allocation bytes
         0, 0, 0, 16,
 
         // main function (function ID 0x00)
