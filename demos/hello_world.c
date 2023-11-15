@@ -1,7 +1,7 @@
 /*
 
 ============================================================
-                        DEMO INFO
+              DEMO INFO
 
 DEMO NAME:          hello_world.c
 DEMO WRITTEN BY:    mukid (hum)
@@ -9,7 +9,7 @@ CREATION DATE:      2023-11-14
 LAST UPDATED:       2023-11-14
 
 ============================================================
-                        DEMO PURPOSE
+              DEMO PURPOSE
 
 This demo simply shows how to construct a simple "Hello, 
 World!" demo in muBytecode, displaying the basic syntactic 
@@ -20,7 +20,7 @@ command.
 ============================================================
 
 ============================================================
-                        LICENSE INFO
+              LICENSE INFO
 
 All code is licensed under MIT License or public domain, 
 whichever you prefer.
@@ -52,24 +52,24 @@ int main() {
 
         0xE0, 0,
 
-            // print command  data type             data type byte size                       char  print spec (character)
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'H',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'e',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'l',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'l',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'o',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), ',',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), ' ',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'W',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'o',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'r',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'l',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), 'd',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), '!',  mu_binary(10000000),
-            0x01,             mu_binary(11000000),  mu_binary(00000000), mu_binary(00000001), '\n', mu_binary(10000000),
+            // print command  data type             byte size  char  print spec (character)
+            0x01,             mu_binary(11000000),  0, 1,      'H',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'e',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'l',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'l',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'o',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      ',',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      ' ',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'W',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'o',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'r',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'l',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      'd',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      '!',  mu_binary(10000000),
+            0x01,             mu_binary(11000000),  0, 1,      '\n', mu_binary(10000000),
 
-            // return command  data type             data type byte size                       return value
-            0x00,              mu_binary(01000000),  mu_binary(00000000), mu_binary(00000001), 0,
+            // return command  data type             byte size  return value
+            0x00,              mu_binary(01000000),  0, 1,      0,
 
         0xE1,
 
