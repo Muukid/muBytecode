@@ -44,7 +44,7 @@ int main() {
         // bit-widths        version major version minor version patch
         mu_binary(00000000), 1,            0,            0,
         // static memory allocation bytes
-        0, 0, 0, 16,
+        0, 0, 0, 0,
         // extra settings data
         0, 0, 0, 0,
 
