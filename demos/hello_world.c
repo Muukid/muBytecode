@@ -1,15 +1,15 @@
 /*
 
 ============================================================
-              DEMO INFO
+                        DEMO INFO
 
 DEMO NAME:          hello_world.c
 DEMO WRITTEN BY:    mukid (hum)
 CREATION DATE:      2023-11-14
-LAST UPDATED:       2023-11-14
+LAST UPDATED:       2023-11-15
 
 ============================================================
-              DEMO PURPOSE
+                        DEMO PURPOSE
 
 This demo simply shows how to construct a simple "Hello, 
 World!" demo in muBytecode, displaying the basic syntactic 
@@ -20,7 +20,7 @@ command.
 ============================================================
 
 ============================================================
-              LICENSE INFO
+                        LICENSE INFO
 
 All code is licensed under MIT License or public domain, 
 whichever you prefer.
@@ -45,7 +45,7 @@ int main() {
         mu_binary(00000000), 1,            0,            0,
         // static memory allocation bytes
         0, 0, 0, 0,
-        // extra settings data
+        // temp memory allocation bytes
         0, 0, 0, 0,
 
         // main function (function ID 0x00)
