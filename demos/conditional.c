@@ -66,21 +66,21 @@ int main() {
 
             /* store if val_0 is greater than val_1 in address 0x01 in the temp memory */
 
-            // greater command  source 0 data type   byte size  address  source 1 data type   byte size  address  dest data type       byte size  address
-            0x94,               mu_binary(01000001), 0, 1,      0x01,    mu_binary(01000001), 0, 1,      0x02,    mu_binary(01010000), 0, 1,      0x01,
-            //                                                                                                                 ^
+            // greater command  source data type     byte size  address 1  address 2  dest data type       byte size  address
+            0x94,               mu_binary(01000001), 0, 1,      0x01,      0x02,      mu_binary(01010000), 0, 1,      0x01,
+            //                                                                                     ^
             // note that we now have to set the temp bit to 1 to let the interpreter know that we
             // want to store this in the temp memory!
 
             /* store if val_0 is less than val_1 in address 0x02 in the temp memory */
 
-            // less command     source 0 data type   byte size  address  source 1 data type   byte size  address  dest data type       byte size  address
-            0x92,               mu_binary(01000001), 0, 1,      0x01,    mu_binary(01000001), 0, 1,      0x02,    mu_binary(01010000), 0, 1,      0x02,
+            // less command  source data type     byte size  address 1  address 2  dest data type       byte size  address
+            0x92,            mu_binary(01000001), 0, 1,      0x01,      0x02,      mu_binary(01010000), 0, 1,      0x02,
 
             /* store if val_0 is equal to val_1 in address 0x03 in the temp memory */
 
-            // equal command    source 0 data type   byte size  address  source 1 data type   byte size  address  dest data type       byte size  address
-            0x90,               mu_binary(01000001), 0, 1,      0x01,    mu_binary(01000001), 0, 1,      0x02,    mu_binary(01010000), 0, 1,      0x03,
+            // equal command  source data type     byte size  address 1  address 2  dest data type       byte size  address
+            0x90,             mu_binary(01000001), 0, 1,      0x01,      0x02,      mu_binary(01010000), 0, 1,      0x03,
 
             /* check if the result of the "greater than" check at temp address 0x01 is true */
 
