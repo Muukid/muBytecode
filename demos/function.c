@@ -27,7 +27,6 @@ More explicit license information at the end of file.
 
 */
 
-#define MUB_QUICK_COMPILE
 #define MUB_IMPLEMENTATION
 #include "muBytecode.h"
 
@@ -110,8 +109,8 @@ int main() {
 
             /* store val_0 + val_1 at 0x03 */
 
-            // add command  source 0 data type   byte size  address  source 1 data type   byte size  address  dest data type       byte size  address
-            0x81,           mu_binary(11000001), 0, 1,      0x01,    mu_binary(11000001), 0, 1,      0x02,    mu_binary(11000000), 0, 1,      0x03,
+            // add command  source data type     byte size  address 1  address 2  dest data type       byte size  address
+            0x81,           mu_binary(11000001), 0, 1,      0x01,      0x02,      mu_binary(11000000), 0, 1,      0x03,
 
             /* store '+' symbol at address 0x04 */
 
@@ -125,10 +124,10 @@ int main() {
 
             /* SUBTRACTION */
 
-            /* store val_0 + val_1 at 0x03 */
+            /* store val_0 - val_1 at 0x03 */
 
-            // subtract command  source 0 data type   byte size  address  source 1 data type   byte size  address  dest data type       byte size  address
-            0x82,                mu_binary(11000001), 0, 1,      0x01,    mu_binary(11000001), 0, 1,      0x02,    mu_binary(11000000), 0, 1,      0x03,
+            // subtract command  source data type     byte size  address 1  address 2  dest data type       byte size  address
+            0x82,                mu_binary(11000001), 0, 1,      0x01,      0x02,      mu_binary(11000000), 0, 1,      0x03,
 
             /* store '-' symbol at address 0x04 */
 
@@ -142,10 +141,10 @@ int main() {
 
             /* MULTIPLICATION */
 
-            /* store val_0 + val_1 at 0x03 */
+            /* store val_0 * val_1 at 0x03 */
 
-            // multiply command  source 0 data type   byte size  address  source 1 data type   byte size  address  dest data type       byte size  address
-            0x83,                mu_binary(11000001), 0, 1,      0x01,    mu_binary(11000001), 0, 1,      0x02,    mu_binary(11000000), 0, 1,      0x03,
+            // multiplication command  source data type     byte size  address 1  address 2  dest data type       byte size  address
+            0x83,                      mu_binary(11000001), 0, 1,      0x01,      0x02,      mu_binary(11000000), 0, 1,      0x03,
 
             /* store '*' symbol at address 0x04 */
 
@@ -159,10 +158,10 @@ int main() {
 
             /* DIVISION */
 
-            /* store val_0 + val_1 at 0x03 */
+            /* store val_0 / val_1 at 0x03 */
 
-            // divide command  source 0 data type   byte size  address  source 1 data type   byte size  address  dest data type       byte size  address
-            0x84,              mu_binary(11000001), 0, 1,      0x01,    mu_binary(11000001), 0, 1,      0x02,    mu_binary(11000000), 0, 1,      0x03,
+            // division command  source data type     byte size  address 1  address 2  dest data type       byte size  address
+            0x84,                mu_binary(11000001), 0, 1,      0x01,      0x02,      mu_binary(11000000), 0, 1,      0x03,
 
             /* store '/' symbol at address 0x04 */
 
