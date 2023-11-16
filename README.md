@@ -428,7 +428,7 @@ A jump marker is declared with `0xF0`, followed by its jump marker ID. It can th
 
 An 'executed' command means that the command is considered when being manually executed by the interpreter. A 'non-executed' command means that it's fully considered when being initially scanned by the interpreter, and ignored during execution.
 
-'dt' is short for data type, 'val' is short for value, 'src' is short for source, and 'dst' is short for destination.
+'dt' is short for data type, 'val' is short for value, 'ad' is short for address, 'src' is short for source, and 'dst' is short for destination.
 
 The difference between a source value and a destination value is that the destination value is interpreted as a place to store the result of the operation being performed on the source value(s). Note that the destination value is always assumed to be an address, even if the dereference count of the corresponding data type is zero. In this case, the destination data type is only describing what the result of the operation should be casted to, and ***the destination value is always assumed to be an address, an unsigned integer of memory address byte length***. It can still be dereferenced numerous times via the data type, but the final type is always assumed to be an address.
 
@@ -462,41 +462,41 @@ Note that this command can be called before a function with its ID is declared, 
 
 **0x80 - move (src_dt, src_val, dst_dt, dst_val)** : An executed command that moves the given source value to the destination address.
 
-**0x81 - add (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that adds the two source values together and stores the result in the destination address.
+**0x81 - add (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that adds the two source values together and stores the result in the destination address.
 
-**0x82 - subtract (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that subtracts source value 1 from source value 0 and stores the result in the destination address.
+**0x82 - subtract (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that subtracts source value 1 from source value 0 and stores the result in the destination address.
 
-**0x83 - multiply (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that multiplies the two source values together and stores the result in the destination address.
+**0x83 - multiply (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that multiplies the two source values together and stores the result in the destination address.
 
-**0x84 - divide (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that divides source value 1 by source value 2 and stores the result in the destination address.
+**0x84 - divide (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that divides source value 1 by source value 2 and stores the result in the destination address.
 
-**0x85 - modulo (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that divides source value 1 by source value 2 and stores the remainder in the destination address.
+**0x85 - modulo (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that divides source value 1 by source value 2 and stores the remainder in the destination address.
 
 **0x86 - bitwise NOT (src_dt, src_val, dst_dt, dst_val)** : An executed command that performs a bitwise NOT operation on the source value and stores the result in the destination address.
 
-**0x87 - bitwise AND (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that performs a bitwise AND operation between the two source values and stores the result in the destination address.
+**0x87 - bitwise AND (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that performs a bitwise AND operation between the two source values and stores the result in the destination address.
 
-**0x88 - bitwise OR (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that performs a bitwise OR operation between the two source values and stores the result in the destination address.
+**0x88 - bitwise OR (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that performs a bitwise OR operation between the two source values and stores the result in the destination address.
 
-**0x89 - bitwise XOR (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that performs a bitwise XOR operation between the two source values and stores the result in the destination address.
+**0x89 - bitwise XOR (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that performs a bitwise XOR operation between the two source values and stores the result in the destination address.
 
-**0x8A - bitwise left shift (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that shifts source value 0 by source value 1 bits left and stores the result in the destination address.
+**0x8A - bitwise left shift (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that shifts source value 0 by source value 1 bits left and stores the result in the destination address.
 
-**0x8B - bitwise right shift (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that shifts source value 0 by source value 1 bits right and stores the result in the destination address.
+**0x8B - bitwise right shift (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that shifts source value 0 by source value 1 bits right and stores the result in the destination address.
 
 #### 0x9_ - conditional storing
 
-**0x90 - equal (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that stores whether or not source value 1 and source value 2 equal each other in the destination address.
+**0x90 - equal (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that stores whether or not source value 1 and source value 2 equal each other in the destination address.
 
-**0x91 - not equal (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that stores whether or not source value 1 and source value 2 don't equal each other in the destination address.
+**0x91 - not equal (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that stores whether or not source value 1 and source value 2 don't equal each other in the destination address.
 
-**0x92 - less (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that stores whether or not source value 1 is less than source value 2 in the destination address.
+**0x92 - less (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that stores whether or not source value 1 is less than source value 2 in the destination address.
 
-**0x93 - less equal (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that stores whether or not source value 1 is less than or equal to source value 2 in the destination address.
+**0x93 - less equal (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that stores whether or not source value 1 is less than or equal to source value 2 in the destination address.
 
-**0x94 - greater (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** :  An executed command that stores whether or not source value 1 is greater than source value 2 in the destination address.
+**0x94 - greater (src_dt, src0_val, src1_val, dst_dt, dst_ad)** :  An executed command that stores whether or not source value 1 is greater than source value 2 in the destination address.
 
-**0x95 - greater equal (src0_dt, src0_val, src1_dt, src1_val, dst_dt, dst_val)** : An executed command that stores whether or not source value 1 is greater than or equal to source value 2 in the destination address.
+**0x95 - greater equal (src_dt, src0_val, src1_val, dst_dt, dst_ad)** : An executed command that stores whether or not source value 1 is greater than or equal to source value 2 in the destination address.
 
 #### 0xA_ - conditional control flow
 
