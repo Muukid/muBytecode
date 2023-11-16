@@ -30,7 +30,6 @@ More explicit license information at the end of file.
 
 */
 
-#define MUB_QUICK_COMPILE
 #define MUB_IMPLEMENTATION
 #include "muBytecode.h"
 
