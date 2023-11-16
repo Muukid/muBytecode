@@ -9,9 +9,11 @@ More explicit license information at the end of the file.
 @TODO test differing bytewidths
 @TODO add more prints for if things go wrong
 @TODO test for bytecode validity by scanning through and checking if any commands go unrecognized
-@TODO add 'ignore bytecode version difference' option
-@TODO figure out proper bitwise operations in relation to src/dst data types
 @TODO make more resilient to crashing
+@TODO implement print spec decimal print accuracy
+@TODO add memory safety checks on each call to 'mu_context_get_memory_location' due to null ptr result
+@TODO fix 64-bit integers not printing without warnings on Windows
+@TODO do more thorough testing on wide character printing
 */
 
 #ifndef MUB_H
@@ -428,8 +430,7 @@ muResult mu_bytecode_check_header_validity(muByte* bytecode, size_m bytecode_len
 		bytecode[6] != MUB_VERSION_MINOR ||
 		bytecode[7] != MUB_VERSION_PATCH
 	) {
-		mu_print("[MUB] Failed to create context; mub version specified in bytecode does not match with the version of this interpreter.\n");
-		return MU_FAILURE;
+		mu_print("[MUB] WARNING! mub version specified in bytecode does not match with the version of this interpreter. Bytecode may not execute properly.\n");
 	}
 
 	// end header
@@ -534,7 +535,6 @@ int64_m mu_context_get_reg_pointer_signed_value(muByte* reg, size_m reg_len) {
 	}
 }
 
-// @TODO add memory safety checks on each call to this due to null ptr result
 muByte* mu_context_get_memory_location(muContext* context, size_m index, int buffer) {
 	if (buffer == 0) {
 		if (index < context->static_memory_len) {
@@ -672,7 +672,6 @@ muResult mu_instruction_return_main(muContext* context, muByte* bytecode) {
 	return MU_SUCCESS;
 }
 
-// @TODO implement spec
 muResult mu_instruction_print(muContext* context, muByte* bytecode) {
 	size_m offset = 0;
 	mubDataType src_dt = mu_get_data_type_from_bytecode(bytecode);
@@ -733,7 +732,6 @@ muResult mu_instruction_print(muContext* context, muByte* bytecode) {
 					switch (src_dt.type) { default: break;
 						case MUB_DATA_TYPE_INTEGER: {
 							switch (src_dt.sign) { default: break;
-								// @TODO kill Microsoft
 								#if !defined(_WIN32) && !defined(WIN32)
 									case MUB_DATA_TYPE_UNSIGNED: { mu_printf("%"PRIu64_m"", *(uint64_m*)context->reg0); return MU_SUCCESS; } break;
 									case MUB_DATA_TYPE_SIGNED:   { mu_printf("%"PRId64_m"", *(int64_m*) context->reg0); return MU_SUCCESS; } break;
@@ -760,7 +758,6 @@ muResult mu_instruction_print(muContext* context, muByte* bytecode) {
 					mu_printf("%s", arr);
 				}
 			} else {
-				// @TODO test if this works
 				uint64_m reg0_val = mu_context_get_reg_pointer_value(context->reg0, src_dt.byte_size);
 				wchar_m arr[2] = { reg0_val, '\0' };
 				setlocale_m(MU_LC_ALL, "");
@@ -1098,7 +1095,6 @@ muByte* mub_advance_header(muContext* context, muByte* bytecode, muByte* bytecod
 			if (!executing) {
 				return bytecode;
 			}
-			// @TODO assign bytecode index to next command to avoid doing an unecessary step per jump
 			if (val < context->jump_marker_len && context->jump_markers[val].index == val) {
 				return &context->bytecode[context->jump_markers[val].bytecode_index];
 			}
@@ -1578,10 +1574,6 @@ MUDEF int mu_context_execute_main(muResult* result, muContext* context) {
 					if_count--;
 				}
 			}
-			// @TODO Thoroughly test if this causes issues;
-			// my train of thought is that this method ignores the ending '0xA0'
-			// which may cause miscounts, but as far as I can tell, that would only apply
-			// to the above code. dunno.
 			if (step[1] == 0xA2) {
 				step += 2;
 			}
