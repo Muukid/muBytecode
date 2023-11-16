@@ -29,7 +29,6 @@ More explicit license information at the end of file.
 
 */
 
-#define MUB_QUICK_COMPILE
 #define MUB_IMPLEMENTATION
 #include "muBytecode.h"
 
@@ -72,10 +71,10 @@ int main() {
 
             /* add values at address 0x01 (val_0) and 0x02 (val_1) and store the result at address 0x03 */
 
-            // add command  source 0 data type   byte size  address  source 1 data type   byte size  address  dest data type       byte size  address
-            0x81,           mu_binary(01000001), 0, 1,      0x01,    mu_binary(01000001), 0, 1,      0x02,    mu_binary(01000000), 0, 1,      0x03,
-            //                               ^              ^                         ^              ^
-            // note that now source 0 and source 1 are addresses to the values we want to use,
+            // add command  src data type        byte size  src address 1  src address 2  dest data type       byte size  dest address
+            0x81,           mu_binary(01000001), 0, 1,      0x01,          0x02,          mu_binary(01000000), 0, 1,      0x03,
+            //                               ^              ^              ^
+            // note that now the first two values are addresses to the values we want to use,
             // so we set our dereference count in both data types to 1, so that the interpreter
             // uses the values at the addresses in the calculation, not the addresses themselves!
 
