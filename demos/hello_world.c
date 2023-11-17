@@ -6,7 +6,7 @@
 DEMO NAME:          hello_world.c
 DEMO WRITTEN BY:    mukid (hum)
 CREATION DATE:      2023-11-14
-LAST UPDATED:       2023-11-15
+LAST UPDATED:       2023-11-16
 
 ============================================================
                         DEMO PURPOSE
@@ -78,7 +78,7 @@ int main() {
     };
 
     // create context with bytecode
-    muContext context = mu_context_create(MU_NULL_PTR, bytecode, sizeof(bytecode));
+    muContext context = mu_context_create(MU_NULL_PTR, bytecode, sizeof(bytecode), MU_TRUE);
 
     // execute main function (ignore return value)
     mu_context_execute_main(MU_NULL_PTR, &context);
