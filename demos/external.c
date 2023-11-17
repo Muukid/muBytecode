@@ -6,7 +6,7 @@
 DEMO NAME:          external.c
 DEMO WRITTEN BY:    mukid (hum)
 CREATION DATE:      2023-11-15
-LAST UPDATED:       2023-11-15
+LAST UPDATED:       2023-11-16
 
 ============================================================
                         DEMO PURPOSE
@@ -192,7 +192,7 @@ int main() {
     };
 
     // create context with bytecode
-    muContext context = mu_context_create(MU_NULL_PTR, bytecode, sizeof(bytecode));
+    muContext context = mu_context_create(MU_NULL_PTR, bytecode, sizeof(bytecode), MU_TRUE);
 
     // find variable named "time" in bytecode
     bc_time = mu_context_get_variable(MU_NULL_PTR, &context, "time");
