@@ -6,7 +6,7 @@
 DEMO NAME:          add.c
 DEMO WRITTEN BY:    mukid (hum)
 CREATION DATE:      2023-11-14
-LAST UPDATED:       2023-11-15
+LAST UPDATED:       2023-11-16
 
 ============================================================
                         DEMO PURPOSE
@@ -59,7 +59,7 @@ int main() {
 
             // move command  source data type     byte size  value  destination data type  byte size  address
             0x80,            mu_binary(01000000), 0, 1,      val_0, mu_binary(01000000),   0, 1,      0x01,
-            //                                ^
+            //                                                                       ^                ^
             // note that the destination data type's dereference count is 0 but is still
             // interpreted as an address due to it being the destination
 
@@ -101,7 +101,7 @@ int main() {
     };
 
     // create context with bytecode
-    muContext context = mu_context_create(MU_NULL_PTR, bytecode, sizeof(bytecode));
+    muContext context = mu_context_create(MU_NULL_PTR, bytecode, sizeof(bytecode), MU_TRUE);
 
     // execute main function (ignore return value)
     mu_context_execute_main(MU_NULL_PTR, &context);
