@@ -185,7 +185,7 @@ A mub context is defined as the struct '`muContext`', and is used to keep track 
 The function `mu_context_create` is used to create a mub context, defined below:
 
 ```
-MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m bytecode_len);
+MUDEF muContext mu_context_create(muResult* result, muByte* bytecode, size_m bytecode_len, muBool fail_if_invalid_bytecode);
 ```
 
 Note that this function is safe to use with a previously deleted context, as it will override all of its contents.
@@ -430,7 +430,7 @@ An 'executed' command means that the command is considered when being manually e
 
 'dt' is short for data type, 'val' is short for value, 'ad' is short for address, 'src' is short for source, and 'dst' is short for destination.
 
-The difference between a source value and a destination value is that the destination value is interpreted as a place to store the result of the operation being performed on the source value(s). Note that the destination value is always assumed to be an address, even if the dereference count of the corresponding data type is zero. In this case, the destination data type is only describing what the result of the operation should be casted to, and ***the destination value is always assumed to be an address, an unsigned integer of memory address byte length***. It can still be dereferenced numerous times via the data type, but the final type is always assumed to be an address.
+The difference between a source value and a destination value is that the destination value is interpreted as a place to store the result of the operation being performed on the source value(s). Note that the destination value is always assumed to be an address, even if the dereference count of the corresponding data type is zero. In this case, the destination data type is only describing what the result of the operation should be casted to, and ***the destination value is always assumed to be an address, an unsigned integer of memory address byte length***. It can still be dereferenced numerous times via the data type, but the final type is always assumed to be an address to store the result at.
 
 ### List of all commands
 
